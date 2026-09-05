@@ -1,50 +1,33 @@
 # monitor_sleep public releases
 
-Windows x64 monitor and display control service written in Rust. This repository contains public binary releases; the source repository remains private.
+Windows x64 monitor and display control service written in Rust. This repository contains public binaries; the source repository remains private.
 
-## v0.02.03: install on double-click, uninstall on Exit
+## v0.03.00
 
-- Double-clicking the EXE (no arguments) installs and starts the automatic Windows service. The service starts one tray agent in the signed-in session.
-- Approve the Windows UAC prompt when administrator access is required.
-- Selecting `끝내기` in the tray restores the display state and runs an administrator helper to stop and remove the service. Cancelling UAC keeps the tray running.
-- The removal helper runs asynchronously so the tray can process its service-stop event without a circular wait.
-- Explicit `--tray` still starts only the tray agent. `--uninstall` requests elevation when needed, accepts an already absent service, and reports a failure if the service cannot stop.
-- Tray icon retries and monitor brightness recovery from v0.02.02 are retained.
+- Verify hardware brightness zero through DDC/CI read-back. Correct nonstandard write/read scales for the tested ZEUSLAP-TYPEC / BOE2556 panel and restore the original value after screen control.
+- Double-click the release EXE, approve UAC, and the program creates its runtime directory, installs/starts the automatic Windows service, and waits for its user-session tray agent to become ready.
+- **The PC remains running. The program does not request Windows sleep or hibernation.** Existing system/execution power requests and USB sleep prevention remain active.
+- Explicit `--install` and `--tray` remain available. Tray Exit restores displays and stops/removes the service after UAC approval.
 
 ## Download and run
 
-1. Download `monitor_sleep_v0.02.03_windows_x64.exe` and `SHA256SUMS.txt` from [v0.02.03](https://github.com/ANSungnam/monitor_sleep-release/releases/tag/v0.02.03).
-2. Create `D:\monitor_sleep_v0.02.03` and place the EXE there. Settings, logs, and recovery paths are fixed to this directory.
-3. Verify its SHA-256 against `SHA256SUMS.txt`.
-4. Double-click the EXE and approve UAC. It installs/starts the service and tray together.
+1. Download `monitor_sleep_v0.03.00_windows_x64.exe` and `SHA256SUMS.txt` from [v0.03.00](https://github.com/ANSungnam/monitor_sleep-release/releases/tag/v0.03.00).
+2. Verify the executable SHA-256 against `SHA256SUMS.txt`.
+3. Double-click the EXE and approve Windows UAC.
 
-When upgrading, close any standalone older tray agent first. The new default startup stops an existing service before registering and starting the new executable. Files and saved settings are retained.
+Installation and runtime files use `D:\monitor_sleep_v0.03.00`; a D: drive is required. The installed executable is `D:\monitor_sleep_v0.03.00\monitor_sleep.exe`. The downloaded file can be moved after installation. Close independently launched older tray agents before upgrading if they hold the shared agent mutex.
 
-```powershell
-& 'D:\monitor_sleep_v0.02.03\monitor_sleep_v0.02.03_windows_x64.exe' --status
-```
+## Tray visibility and controls
 
-## Tray and removal
+Windows can hide a registered icon in the overflow area. Open **Settings > Personalization > Taskbar > Other system tray icons** and enable the current `monitor_sleep.exe` entry. Older versions may have separate entries with the same name. This visibility setting is separate from service installation and tray registration.
 
-Right-click the icon to pause/resume monitor control, use `즉시 적용`, choose the idle timeout, or select `끝내기`.
-Pausing preserves background sleep prevention. **Exit now stops and removes the service**, ending this program's background sleep-prevention requests.
-Application files and settings are not deleted. To install/start again, double-click the EXE.
-
-Alternatively, run:
-
-```powershell
-& 'D:\monitor_sleep_v0.02.03\monitor_sleep_v0.02.03_windows_x64.exe' --uninstall
-```
-
-`--install` explicitly installs/starts the service. `--tray` explicitly launches only the agent. `--update-service` is not supported by this public package layout.
+Right-click the icon to pause/resume monitor control, select `즉시 적용`, change the idle timeout, or select `끝내기`. Pausing retains background sleep prevention. Exit removes the service and ends this program's power requests; files and settings remain. Double-click the release EXE to install/start again.
 
 ## Validation and limits
 
-- All 18 tests passed, including the Windows notification-area icon recovery test; strict Clippy and the release build passed.
-- The changed lifecycle was tested against an actual Windows service: default startup with one agent, removal through the same helper entry point used by Tray Exit, repeated removal when already absent, and reinstallation.
-- The final v0.02.03 was started with no arguments from a normal user process and verified as Running/Auto with one session agent and successful tray initialization.
-- Actual mouse selection of Tray Exit and cancellation of UAC were not separately exercised.
-- Previously tested internal-panel brightness completed `85 -> 0 -> 85`. The tested Samsung S24F350 and LG FULL HD connections returned DDC/CI error 122; their physical brightness was not changed. This release does not establish brightness support for all monitors.
-- 0% means the device-reported minimum, not guaranteed physical backlight shutdown.
-
-This is an unsigned, device-specific early release. It can change power, USB sleep, brightness, and display-topology settings. The program uses native Windows APIs and does not require a Python/PowerShell runtime or helper scripts.
+- 19 automated tests passed; one Explorer integration test was skipped.
+- Physical brightness read-back on the tested ZEUSLAP/BOE2556 monitor verified `34 -> 0 -> 34`.
+- The actual black-overlay activation path produced five consecutive hardware samples of zero and restored brightness to 34.
+- No-argument release execution was verified with a running automatic service and a ready service-owned tray agent.
+- Hardware zero requires monitor/connection DDC/CI support. Zero is the device-reported minimum and does not guarantee that the backlight is physically off.
+- This is an unsigned, device-specific early release. Existing optional Surface/LG/Samsung startup-layout presets must match the intended display setup. The program changes power, USB, brightness, and display-topology settings using native Windows APIs.

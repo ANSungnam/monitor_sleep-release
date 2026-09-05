@@ -1,85 +1,50 @@
 # monitor_sleep public releases
 
-`monitor_sleep` is a Windows x64 monitor-sleep and display-recovery service written in Rust.
-This repository contains public binary releases only. The source repository is private.
+Windows x64 monitor and display control service written in Rust. This repository contains public binary releases; the source repository remains private.
 
-## v0.02.02: tray recovery and monitor brightness control
+## v0.02.03: install on double-click, uninstall on Exit
 
-- Retries failed initial tray creation every five seconds.
-- Receives `TaskbarCreated` through a hidden top-level window and retries icon registration after Explorer restarts. Periodic registration checks also recover a missed notification.
-- Enumerates physical monitors without manufacturer/model filters and requests minimum brightness through DDC/CI VCP 0x10, the Windows brightness API, and the internal LCD interface.
-- Saves brightness before changing it, dims monitors before disconnecting secondary display signals, and restores each supported monitor after reconnecting. Failed restorations remain pending and are retried.
-- Retains the existing Windows sleep-prevention behavior.
+- Double-clicking the EXE (no arguments) installs and starts the automatic Windows service. The service starts one tray agent in the signed-in session.
+- Approve the Windows UAC prompt when administrator access is required.
+- Selecting `끝내기` in the tray restores the display state and runs an administrator helper to stop and remove the service. Cancelling UAC keeps the tray running.
+- The removal helper runs asynchronously so the tray can process its service-stop event without a circular wait.
+- Explicit `--tray` still starts only the tray agent. `--uninstall` requests elevation when needed, accepts an already absent service, and reports a failure if the service cannot stop.
+- Tray icon retries and monitor brightness recovery from v0.02.02 are retained.
 
-### Validation and limits
+## Download and run
 
-17 automated tests and one interactive Windows tray-recovery test passed, along with strict Clippy checks and a release build. The internal panel completed a measured `85 -> 0 -> 85` brightness cycle.
+1. Download `monitor_sleep_v0.02.03_windows_x64.exe` and `SHA256SUMS.txt` from [v0.02.03](https://github.com/ANSungnam/monitor_sleep-release/releases/tag/v0.02.03).
+2. Create `D:\monitor_sleep_v0.02.03` and place the EXE there. Settings, logs, and recovery paths are fixed to this directory.
+3. Verify its SHA-256 against `SHA256SUMS.txt`.
+4. Double-click the EXE and approve UAC. It installs/starts the service and tray together.
 
-On the tested Samsung S24F350 and LG FULL HD connection, both DDC/CI methods returned Windows error 122. Their physical brightness was **not changed**. Monitor/connection support is required; minimum brightness (0%) is not a guarantee that the backlight is physically off. Unsupported or ambiguous device identities are logged and left unchanged.
-
-### Default startup
-
-As in the previous version, `monitor_sleep.exe` now defaults to `monitor_sleep.exe --tray`. Double-clicking the downloaded executable also starts the tray agent; no command-line option or service installation is required. Use `--help` to view commands.
-
-## v0.02.02 notice
-
-- This is a device-specific early release for advanced users.
-- The executable is not code-signed, so Windows may show a SmartScreen warning.
-- Runtime settings, recovery markers, and logs are fixed to `D:\monitor_sleep_v0.02.02`.
-- The service can change Windows power, USB sleep, brightness, and display-topology settings.
-- The packaged executable does not use Python, PowerShell, batch files, or helper executables at runtime.
-- `--update-service` is not supported by this public package layout. Uninstall the old service before installing a later version.
-
-## Installation
-
-1. Download `monitor_sleep_v0.02.02_windows_x64.exe` and `SHA256SUMS.txt` from the release page.
-2. Create `D:\monitor_sleep_v0.02.02` and place the executable in that directory.
-3. Verify the downloaded executable against `SHA256SUMS.txt`.
-4. Double-click the executable to start the system-tray agent.
-
-### Optional automatic Windows service
-
-For automatic startup as a Windows service, open PowerShell as Administrator and run:
+When upgrading, close any standalone older tray agent first. The new default startup stops an existing service before registering and starting the new executable. Files and saved settings are retained.
 
 ```powershell
-D:\monitor_sleep_v0.02.02\monitor_sleep_v0.02.02_windows_x64.exe --install
+& 'D:\monitor_sleep_v0.02.03\monitor_sleep_v0.02.03_windows_x64.exe' --status
 ```
 
-Check the service:
+## Tray and removal
+
+Right-click the icon to pause/resume monitor control, use `즉시 적용`, choose the idle timeout, or select `끝내기`.
+Pausing preserves background sleep prevention. **Exit now stops and removes the service**, ending this program's background sleep-prevention requests.
+Application files and settings are not deleted. To install/start again, double-click the EXE.
+
+Alternatively, run:
 
 ```powershell
-D:\monitor_sleep_v0.02.02\monitor_sleep_v0.02.02_windows_x64.exe --status
+& 'D:\monitor_sleep_v0.02.03\monitor_sleep_v0.02.03_windows_x64.exe' --uninstall
 ```
 
-## System tray (default, or `--tray`)
+`--install` explicitly installs/starts the service. `--tray` explicitly launches only the agent. `--update-service` is not supported by this public package layout.
 
-The installed Windows service normally starts the system-tray agent automatically in the signed-in user session. To start or restore it manually, run:
+## Validation and limits
 
-```powershell
-cd D:\monitor_sleep_v0.02.02
-.\monitor_sleep_v0.02.02_windows_x64.exe --tray
-```
+- All 18 tests passed, including the Windows notification-area icon recovery test; strict Clippy and the release build passed.
+- The changed lifecycle was tested against an actual Windows service: default startup with one agent, removal through the same helper entry point used by Tray Exit, repeated removal when already absent, and reinstallation.
+- The final v0.02.03 was started with no arguments from a normal user process and verified as Running/Auto with one session agent and successful tray initialization.
+- Actual mouse selection of Tray Exit and cancellation of UAC were not separately exercised.
+- Previously tested internal-panel brightness completed `85 -> 0 -> 85`. The tested Samsung S24F350 and LG FULL HD connections returned DDC/CI error 122; their physical brightness was not changed. This release does not establish brightness support for all monitors.
+- 0% means the device-reported minimum, not guaranteed physical backlight shutdown.
 
-The command starts the tray agent without leaving a console window open and returns immediately to PowerShell. Only one tray agent runs in a user session, so repeated commands do not create duplicate icons.
-
-Tray menu functions:
-
-- The notification area uses the Windows monitor/desktop-PC icon.
-- Right-click the icon to pause or resume monitor control.
-- Select `즉시 적용` above `1분` to run the monitor-off and black-screen action
-  immediately without changing the saved idle timeout.
-- Select an idle timeout of 1, 3, 5, 10, 15, 30, or 60 minutes.
-- Double-click the icon to toggle pause and resume.
-- Select `끝내기` to close the tray agent and monitor control. If the Windows service is installed and running, its background sleep prevention remains active.
-- Run `.\monitor_sleep_v0.02.02_windows_x64.exe --tray` again to restore the tray agent after selecting `끝내기`.
-- Restarting the service or Windows also restores the tray agent automatically.
-
-## Uninstall
-
-Open PowerShell as Administrator and run:
-
-```powershell
-D:\monitor_sleep_v0.02.02\monitor_sleep_v0.02.02_windows_x64.exe --uninstall
-```
-
-When upgrading from an earlier version, uninstall the old service with its executable before installing `v0.02.02`.
+This is an unsigned, device-specific early release. It can change power, USB sleep, brightness, and display-topology settings. The program uses native Windows APIs and does not require a Python/PowerShell runtime or helper scripts.

@@ -1,0 +1,64 @@
+name: Publish Monitor Sleep v0.06.00
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'releases/v0.06.00/**'
+      - '.github/workflows/publish-v0.06.00.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: publish-monitor-sleep-v0.06.00
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download the reviewed release files and verify hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release-files
+          cd release-files
+          for file in monitor_sleep_v0.06.00_windows_x64.exe monitor_sleep_v0.06.00_windows_x64.zip SHA256SUMS.txt RELEASE_NOTES.md; do
+            curl --fail --silent --show-error --location --retry 3 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/releases/v0.06.00/$file" --output "$file"
+          done
+          sha256sum --check SHA256SUMS.txt
+          python3 - <<'PY'
+          import zipfile, hashlib
+          with zipfile.ZipFile('monitor_sleep_v0.06.00_windows_x64.zip') as z:
+              assert z.testzip() is None
+              prefix = 'monitor_sleep_v0.06.00/'
+              assert len(z.namelist()) == 9
+              assert not any('/source/' in p or p.endswith(('.rs', '.json', '.xml')) for p in z.namelist())
+              assert z.read(prefix+'monitor_sleep.exe') == open('monitor_sleep_v0.06.00_windows_x64.exe', 'rb').read()
+              for line in z.read(prefix+'SHA256SUMS.txt').decode().splitlines():
+                  expected, name = line.split(None, 1)
+                  assert hashlib.sha256(z.read(prefix+name)).hexdigest() == expected
+          PY
+      - name: Create draft, upload, verify, and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-files
+          tag=v0.06.00
+          if ! gh release view "$tag" --json isDraft --jq .isDraft > ../release-state; then
+            gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Monitor Sleep v0.06.00" --notes-file RELEASE_NOTES.md
+            echo true > ../release-state
+          fi
+          if [ "$(cat ../release-state)" = true ]; then
+            gh release upload "$tag" monitor_sleep_v0.06.00_windows_x64.exe monitor_sleep_v0.06.00_windows_x64.zip SHA256SUMS.txt --clobber
+          fi
+          mkdir ../release-check
+          gh release download "$tag" --dir ../release-check --pattern monitor_sleep_v0.06.00_windows_x64.exe --pattern monitor_sleep_v0.06.00_windows_x64.zip --pattern SHA256SUMS.txt
+          cmp SHA256SUMS.txt ../release-check/SHA256SUMS.txt
+          (cd ../release-check && sha256sum --check SHA256SUMS.txt)
+          if [ "$(cat ../release-state)" = true ]; then
+            gh release edit "$tag" --draft=false --latest --title "Monitor Sleep v0.06.00" --notes-file RELEASE_NOTES.md
+          fi
+          gh release view "$tag" --json url,isDraft,assets

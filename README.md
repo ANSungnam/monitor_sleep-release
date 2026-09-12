@@ -1,4 +1,27 @@
-# Monitor Sleep v0.06.00
+# Monitor Sleep v0.08.00
+
+Windows 10/11 x64용 순수 Rust 모니터 제어 프로그램입니다.
+
+- 기본 5분 유휴 후 내장 화면: 검정 화면 및 밝기 0
+- 기본 5분 유휴 후 외부 화면: 밝기·절전 명령 없이 표시 신호만 분리
+- 입력 복귀 시: 저장한 내장 밝기와 독립 3모니터 배치 복구
+- LocalSystem 자동 서비스: Windows 절전 방지, 네트워크·USB 유지 요청
+- 시스템 트레이: 일시정지·재개, 유휴 시간 변경, 즉시 적용
+- 설치·실행 경로: `D:\monitor_sleep_v0.08.00`
+
+다운로드한 `monitor_sleep_v0.08.00_windows_x64.exe`를 실행하고 관리자 권한 요청을 승인하면 고정 경로의 `monitor_sleep.exe`와 자동 시작 서비스를 준비합니다. 기존 서비스가 다른 구버전 경로에 있으면 등록된 EXE 위치를 설정 이전용으로만 읽습니다.
+
+자동 검사 42개 중 39개가 통과했고 관리자 Task Scheduler 2개와 Explorer 트레이 1개 실환경 시험은 제외했습니다. 실제 3모니터 유휴·복구, 인터넷·USB 연속성, 로그오프·종료·재부팅과 설치 rollback은 아직 v0.08.00 실기 검증 전입니다.
+
+[v0.08.00 다운로드](https://github.com/ANSungnam/monitor_sleep-release/releases/tag/v0.08.00)
+
+SHA-256: `0FC32840228BDCB8E0C45DD77A61832A7914446D4EC32AA7D38F71AFAC2FF1D4`
+
+이 EXE는 Authenticode 서명이 없으므로 반드시 이 GitHub Release에서 내려받고 `SHA256SUMS.txt`와 대조하세요.
+
+---
+
+## 이전 배포: Monitor Sleep v0.06.00
 
 Windows 10 및 Windows 11 x64용 관리자 권한 모니터 제어 프로그램입니다.
 
